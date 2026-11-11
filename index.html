@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>냄새·물 신뢰 지도</title>
+<meta name="description" content="김해시도시개발공사 환경시설 주변 냄새·물 정보를 주민 신고 → 공사 조치 → 일 단위 공개로 잇는 시범 웹·앱(PWA)">
+<meta name="theme-color" content="#0f2a3d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--bg:#f4f7fa;--card:#fff;--ink:#14212b;--mut:#5b6b78;--line:#dbe3ea;--pri:#0f6fa8;--pri2:#0f2a3d;--ok:#1b8a5a;--warn:#c77700;--bad:#c62f2f}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1820;--card:#16242f;--ink:#e8eff4;--mut:#9fb0bc;--line:#27394a;--pri:#4fb3ea;--pri2:#0a121a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding-bottom:70px}
+header{background:var(--pri2);color:#fff;padding:12px 16px calc(12px)}header h1{margin:0;font-size:18px}header p{margin:2px 0 0;font-size:12px;opacity:.8}
+.demo{background:#fff4d6;color:#5a4200;border-bottom:1px solid #f0d98a;padding:8px 16px;font-size:12.5px}
+@media(prefers-color-scheme:dark){.demo{background:#3a2f0b;color:#f4e2a1;border-color:#5a4a14}}
+main{max-width:920px;margin:0 auto;padding:12px 16px}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
+h2{font-size:16px;margin:0 0 8px}h3{font-size:14px;margin:12px 0 6px}
+#map{height:56vh;min-height:320px;border-radius:12px;border:1px solid var(--line)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:var(--mut);padding:9px 2px;font-size:11.5px;cursor:pointer}nav button b{display:block;font-size:18px;font-weight:400}nav button.on{color:var(--pri);font-weight:700}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+select,input[type=text],textarea,input[type=range]{width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+button.btn{background:var(--pri);color:#fff;border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700;cursor:pointer}button.btn.alt{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:1}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.kpi div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}.kpi b{display:block;font-size:22px}.kpi span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left;vertical-align:top}th{color:var(--mut);font-weight:600}
+.tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:11px;border:1px solid var(--line)}.tag.d{background:#fff4d6;color:#5a4200;border-color:#f0d98a}.tag.ok{color:var(--ok);border-color:var(--ok)}.tag.w{color:var(--warn);border-color:var(--warn)}
+.bars{display:flex;align-items:flex-end;gap:3px;height:90px}.bars i{flex:1;background:var(--pri);border-radius:3px 3px 0 0;min-height:2px;position:relative}.bars i.hi{background:var(--bad)}.bars i.md{background:var(--warn)}
+.lbl{display:flex;gap:3px;font-size:10px;color:var(--mut)}.lbl span{flex:1;text-align:center}
+small,.mut{color:var(--mut);font-size:12px}.safe{background:#fdecec;color:#7a1c1c;border:1px solid #f1b9b9;border-radius:8px;padding:8px;font-size:13px}
+@media(prefers-color-scheme:dark){.safe{background:#3a1717;color:#f6c2c2;border-color:#6a2a2a}}
+#qr{background:#fff;padding:10px;display:inline-block;border-radius:8px}
+</style>
+</head>
+<body>
+<header><h1>냄새·물 신뢰 지도 <small style="color:#9fd4f2">시범판 v1</small></h1><p>신고 → 조치 → 공개 → 예측 · 김해시도시개발공사 환경시설 주변</p></header>
+<div class="demo"><b>시연판 안내</b> · 지도의 「시연」 표시 신고·조치는 기능 설명용 <b>가상 데이터</b>이며 실제 민원이 아닙니다. 시설 위치도 대략적인 시연용 좌표입니다. 이 화면에서 직접 입력한 신고는 <b>이 기기에만</b> 저장되며 공사에 전달되지 않습니다. 실제 운영 시에는 공사 서버·누리집에 연결합니다.</div>
+<main>
+<section id="s-map" class="on">
+ <div class="card"><div class="kpi" id="kpi"></div></div>
+ <div id="map" aria-label="신고 지도"></div>
+ <p class="mut">● 색: 강도(0~5) · ◆ 공사 시설 · 위치는 약 500m 격자 중심으로만 표시합니다. 지도를 눌러 위치를 선택한 뒤 「신고」 탭에서 접수하세요.</p>
+</section>
+<section id="s-report">
+ <div class="card">
+  <div class="safe">⚠ 냄새 진원지에 접근하지 마세요. 호흡 곤란·두통이 있으면 즉시 이동하고, 위급하면 <b>119</b>.</div>
+  <h2 style="margin-top:12px">냄새 신고 (로그인·이름·연락처 없음)</h2>
+  <label>유형</label><select id="r-type"><option>하수·분뇨 냄새</option><option>슬러지·퇴비 냄새</option><option>음식물·음폐수 냄새</option><option>화학·가스 냄새</option><option>물 색·거품 이상</option><option>기타</option></select>
+  <label>냄새 강도: <b id="r-lv-t">2</b> / 5 <small>(0 없음 · 1 감지 · 2 약함 · 3 불쾌 · 4 심함 · 5 견디기 어려움)</small></label><input type="range" id="r-lv" min="0" max="5" value="2">
+  <label>위치 (격자 중심 ≈500m로만 저장·공개)</label>
+  <div class="row"><button class="btn alt" id="r-gps" type="button">현재 위치 사용</button><button class="btn alt" id="r-pick" type="button">지도에서 선택</button></div>
+  <p class="mut" id="r-loc">선택된 위치 없음</p>
+  <label>메모 (선택, 개인정보 쓰지 마세요)</label><textarea id="r-memo" rows="2" maxlength="120"></textarea>
+  <p style="margin-top:12px"><button class="btn" id="r-go" type="button">신고 접수</button></p>
+  <p class="mut" id="r-msg"></p>
+ </div>
+</section>
+<section id="s-act">
+ <div class="card"><h2>공사 조치 기록 <span class="tag d">시연</span></h2>
+  <p class="mut">신고가 기준을 넘으면 시설 담당자가 점검표를 실행하고 결과를 기록합니다. 기록은 일 단위 공개판에 자동 반영됩니다. (시연: 누구나 입력 가능 · 실제 운영 시 담당자 인증)</p>
+  <div id="due"></div>
+  <h3>점검표 실행 기록</h3>
+  <label>시설</label><select id="a-fac"></select>
+  <label>실행한 조치 (복수 선택)</label><div id="a-chk"></div>
+  <label>메모</label><input type="text" id="a-memo" maxlength="80">
+  <p><button class="btn" id="a-go" type="button">조치 기록 저장</button></p><p class="mut" id="a-msg"></p>
+ </div>
+</section>
+<section id="s-pub">
+ <div class="card"><h2>일 단위 공개판</h2><div class="kpi" id="pkpi"></div>
+  <h3>최근 14일 신고 건수</h3><div class="bars" id="bars"></div><div class="lbl" id="blbl"></div>
+  <h3>일자별 신고·조치</h3><table id="ptab"></table>
+  <p><button class="btn alt" id="csv" type="button">CSV 내려받기 (개방용)</button></p>
+  <h3>기존 공개 자료 바로가기</h3>
+  <p class="mut">방류수질·복합악취·수영장 수질 등은 공사 누리집 「시설이용안내·환경정보·공기질현황」에서 제공합니다. 본 화면은 그 <b>앞에 일 단위 층</b>을 얹는 시범입니다(공사 현황은 제안서 2026.11.10 확인 기준).</p>
+ </div>
+</section>
+<section id="s-pred">
+ <div class="card"><h2>냄새 가능 시간대 (시범 지표)</h2>
+  <p class="mut">공개 기상 예보(Open-Meteo, 키 불필요)의 풍향·풍속·습도와 최근 신고를 합쳐 향후 12시간의 <b>점검 우선도</b>를 계산합니다. 현재는 <b>규칙 기반 지표</b>이며 학습 모형이 아닙니다. 신고가 시간대별로 충분히 쌓이면 랜덤포레스트 계열로 대체하고 시간 순서 분할로 검증합니다(제안서 ④단계).</p>
+  <p><button class="btn" id="wx" type="button">예보 불러오기</button></p>
+  <div class="bars" id="pbars"></div><div class="lbl" id="plbl"></div><div id="pnote" class="mut"></div>
+  <h3>참고 근거</h3>
+  <p class="mut">Smell Pittsburgh: 신고 26,556건 기반, 향후 8시간 냄새 예측 F-score 0.70 (Hsu 외, arXiv:1912.11936). 시카고 물재생구역: H2S·기상·운영 자료 결합으로 악취 민원 3일 전 예측 정확도 60% 이상(Mulrow 외, 2020). 위 두 결과는 해외 사례이며 김해에서의 성능은 시범으로 검증합니다.</p>
+ </div>
+</section>
+<section id="s-info">
+ <div class="card"><h2>설치·공유</h2>
+  <p>이 화면은 <b>웹 앱(PWA)</b>입니다. 휴대폰 브라우저 메뉴의 「홈 화면에 추가」로 앱처럼 설치되고, 한 번 열면 오프라인에서도 열립니다.</p>
+  <p><button class="btn" id="inst" type="button" hidden>앱으로 설치</button></p>
+  <div id="qr"></div><p class="mut" id="qrurl"></p>
+  <h3>시설 게시물용 QR</h3><p class="mut">위 QR을 시설 주변 게시물·누리집·대학 게시판에 붙이면 주민이 설치 없이 바로 신고합니다.</p>
+ </div>
+ <div class="card"><h2>이 시범판의 한계</h2>
+  <ul class="mut"><li>데이터 저장: 현재 시연판은 기기 내 저장입니다. 실제 시범에서는 공사가 지정한 서버(또는 무료 웹 도구)로 신고를 모읍니다.</li>
+  <li>예측은 규칙 기반 지표이며 효과는 시범 첫 달 측정 후 확정합니다.</li>
+  <li>시설 좌표·주거지 방위는 시연용 가정치입니다.</li>
+  <li>개인정보: 이름·연락처를 받지 않고 위치는 격자 단위만 보관합니다.</li></ul>
+  <p><button class="btn alt" id="reset" type="button">내 기기 입력 데이터 지우기</button></p>
+ </div>
+</section>
+</main>
+<nav>
+ <button data-t="map" class="on"><b>🗺</b>지도</button><button data-t="report"><b>✍</b>신고</button><button data-t="act"><b>🛠</b>조치</button><button data-t="pub"><b>📊</b>공개판</button><button data-t="pred"><b>🌬</b>예측</button><button data-t="info"><b>ⓘ</b>정보</button>
+</nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const KEY='ssj_v1';
+// 시연용 가정 좌표(실제 시설 위치 아님)
+const FAC=[{id:'F1',n:'맑은물순환센터(시연 위치)',lat:35.1960,lng:128.8020},{id:'F2',n:'자원화처리시설(시연 위치)',lat:35.2270,lng:128.8560}];
+const CHK=['슬러지 탈수·반출 시간 조정','탈취설비 가동 상태 확인','덮개·밀폐 상태 점검','소화조 운전 상태 확인','방류수질 즉시 확인','현장 순찰 및 사진 기록'];
+const RES_BEARING=95; // 시연용: 주거지가 시설 동쪽(방위 95°)이라고 가정
+const GR=0.005;const snap=v=>Math.round(v/GR)*GR;
+const dstr=d=>{const z=new Date(d);return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0')};
+function seed(){ // 결정적 시연 데이터
+ let s=7,r=()=>(s=(s*9301+49297)%233280)/233280;const out=[],now=Date.now();
+ for(let i=0;i<46;i++){const f=FAC[r()<.65?0:1];const t=now-Math.floor(r()*13.5*864e5);const hr=new Date(t).getHours();
+  const lv=Math.max(1,Math.min(5,Math.round(1+r()*2+(hr<8||hr>19?1.2:0))));
+  out.push({id:'d'+i,t,lat:snap(f.lat+(r()-.35)*.014),lng:snap(f.lng+(r()-.2)*.016),lv,ty:'하수·분뇨 냄새',demo:1,m:''});}
+ return out}
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||{rep:[],act:[]}}catch(e){return {rep:[],act:[]}}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
+let st=load();const SEED=seed();
+const SEEDACT=[{t:Date.now()-2*864e5,fac:'F1',items:[0,1],m:'탈수 시간 야간→주간 조정',demo:1},{t:Date.now()-5*864e5,fac:'F2',items:[2,5],m:'덮개 점검 완료',demo:1},{t:Date.now()-9*864e5,fac:'F1',items:[3],m:'소화조 운전 확인',demo:1}];
+const reps=()=>SEED.concat(st.rep).sort((a,b)=>b.t-a.t),acts=()=>SEEDACT.concat(st.act).sort((a,b)=>b.t-a.t);
+// 탭
+$$('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+function show(t){$$('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));$$('section').forEach(x=>x.classList.toggle('on',x.id==='s-'+t));if(t==='map'){setTimeout(()=>map.invalidateSize(),50);drawMap()}if(t==='pub')pub();if(t==='act')actUI()}
+// 지도
+const map=L.map('map').setView([35.211,128.83],12);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(map);
+const lay=L.layerGroup().addTo(map);let pick=null,pickM=null,picking=false;
+const col=l=>['#2e9e6a','#7fbf3f','#e0c020','#f09020','#e0502a','#b01a1a'][l];
+function drawMap(){lay.clearLayers();const cut=Date.now()-7*864e5;
+ FAC.forEach(f=>L.marker([f.lat,f.lng],{icon:L.divIcon({html:'<div style="background:#0f2a3d;color:#fff;border-radius:4px;padding:1px 5px;font-size:11px;white-space:nowrap;transform:translate(-50%,-50%)">◆ '+f.n.replace('(시연 위치)','')+'</div>',className:''})}).addTo(lay));
+ reps().filter(r=>r.t>cut).forEach(r=>L.circleMarker([r.lat,r.lng],{radius:5+r.lv*1.6,color:col(r.lv),fillColor:col(r.lv),fillOpacity:.55,weight:1}).bindPopup((r.demo?'[시연] ':'')+r.ty+' · 강도 '+r.lv+'<br>'+new Date(r.t).toLocaleString('ko-KR')+(r.m?'<br>'+esc(r.m):'')).addTo(lay));
+ const k=reps(),d=dstr(Date.now()),td=k.filter(r=>dstr(r.t)===d).length,w=k.filter(r=>r.t>cut).length,ac=acts().filter(a=>a.t>cut).length;
+ $('#kpi').innerHTML=`<div><b>${td}</b><span>오늘 신고</span></div><div><b>${w}</b><span>최근 7일 신고</span></div><div><b>${ac}</b><span>최근 7일 조치 기록</span></div><div><b>${medAct()}</b><span>신고→조치 중앙값(시)</span></div>`}
+function medAct(){const A=acts();const hs=[];reps().forEach(r=>{const a=A.filter(x=>x.t>=r.t).sort((p,q)=>p.t-q.t)[0];if(a&&a.t-r.t<7*864e5)hs.push((a.t-r.t)/36e5)});if(!hs.length)return '–';hs.sort((a,b)=>a-b);return Math.round(hs[hs.length>>1])}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+map.on('click',e=>{if(!picking)return;setPick(e.latlng.lat,e.latlng.lng);picking=false;show('report')});
+function setPick(a,b){pick={lat:snap(a),lng:snap(b)};$('#r-loc').textContent='선택: 격자 중심 '+pick.lat.toFixed(3)+', '+pick.lng.toFixed(3)+' (≈500m)';if(pickM)map.removeLayer(pickM);pickM=L.marker([pick.lat,pick.lng]).addTo(map)}
+// 신고
+$('#r-lv').oninput=e=>$('#r-lv-t').textContent=e.target.value;
+$('#r-gps').onclick=()=>{if(!navigator.geolocation){$('#r-msg').textContent='이 기기는 위치 기능이 없습니다. 「지도에서 선택」을 쓰세요.';return}navigator.geolocation.getCurrentPosition(p=>setPick(p.coords.latitude,p.coords.longitude),()=>$('#r-msg').textContent='위치를 가져오지 못했습니다. 「지도에서 선택」을 쓰세요.',{timeout:8000})};
+$('#r-pick').onclick=()=>{picking=true;show('map');alert('지도에서 냄새를 느낀 곳을 한 번 누르세요.')};
+$('#r-go').onclick=()=>{if(!pick){$('#r-msg').textContent='위치를 먼저 선택하세요.';return}
+ const last=st.rep.filter(r=>r.t>Date.now()-36e5).length;if(last>=5){$('#r-msg').textContent='이 기기에서는 1시간에 5건까지 접수됩니다.';return}
+ st.rep.push({id:'u'+Date.now(),t:Date.now(),lat:pick.lat,lng:pick.lng,lv:+$('#r-lv').value,ty:$('#r-type').value,m:$('#r-memo').value.trim()});save();
+ $('#r-memo').value='';$('#r-msg').textContent='접수되었습니다(시연: 이 기기에 저장). 지도·공개판에 반영됩니다.';drawMap()};
+// 조치
+function actUI(){const n=reps().filter(r=>r.t>Date.now()-864e5);const hi=n.filter(r=>r.lv>=3).length;
+ $('#due').innerHTML=`<div class="card" style="margin:0 0 6px">최근 24시간 신고 <b>${n.length}</b>건 · 강도 3 이상 <b>${hi}</b>건 ${hi>=3?'<span class="tag w">점검 기준 초과(시연 기준: 3건)</span>':'<span class="tag ok">기준 이내</span>'}</div>`;
+ $('#a-fac').innerHTML=FAC.map(f=>`<option value="${f.id}">${f.n}</option>`).join('');
+ $('#a-chk').innerHTML=CHK.map((c,i)=>`<label style="margin:2px 0;color:var(--ink)"><input type="checkbox" value="${i}"> ${c}</label>`).join('')}
+$('#a-go').onclick=()=>{const it=$$('#a-chk input:checked').map(x=>+x.value);if(!it.length){$('#a-msg').textContent='실행한 조치를 하나 이상 선택하세요.';return}
+ st.act.push({t:Date.now(),fac:$('#a-fac').value,items:it,m:$('#a-memo').value.trim()});save();$('#a-memo').value='';$$('#a-chk input').forEach(x=>x.checked=false);$('#a-msg').textContent='기록되었습니다. 공개판에 반영됩니다.';drawMap()};
+// 공개판
+function pub(){const R=reps(),A=acts(),days=[];for(let i=0;i<14;i++)days.push(dstr(Date.now()-i*864e5));
+ const cnt=days.map(d=>R.filter(r=>dstr(r.t)===d).length),mx=Math.max(1,...cnt);
+ const rd=days.slice().reverse(),cr=cnt.slice().reverse();
+ $('#bars').innerHTML=cr.map((c,i)=>`<i title="${rd[i]} ${c}건" class="${c>=mx*.8&&c>3?'hi':c>=mx*.5?'md':''}" style="height:${Math.max(2,c/mx*100)}%"></i>`).join('');
+ $('#blbl').innerHTML=rd.map(d=>`<span>${d.slice(8)}</span>`).join('');
+ const act14=A.filter(a=>a.t>Date.now()-14*864e5).length,rep14=R.filter(r=>r.t>Date.now()-14*864e5).length;
+ $('#pkpi').innerHTML=`<div><b>${rep14}</b><span>14일 신고</span></div><div><b>${act14}</b><span>14일 조치 기록</span></div><div><b>1일</b><span>공개 주기(이 화면)</span></div><div><b>${medAct()}</b><span>신고→조치 중앙값(시)</span></div>`;
+ $('#ptab').innerHTML='<tr><th>일자</th><th>신고</th><th>최고강도</th><th>조치 내용</th></tr>'+days.map(d=>{const rr=R.filter(r=>dstr(r.t)===d),aa=A.filter(a=>dstr(a.t)===d);return `<tr><td>${d.slice(5)}</td><td>${rr.length}${rr.some(r=>r.demo)?' <span class="tag d">시연</span>':''}</td><td>${rr.length?Math.max(...rr.map(r=>r.lv)):'–'}</td><td>${aa.map(a=>(FAC.find(f=>f.id===a.fac)||{n:''}).n.replace('(시연 위치)','')+': '+a.items.map(i=>CHK[i]).join(', ')+(a.m?' ('+esc(a.m)+')':'')).join('<br>')||'–'}</td></tr>`}).join('')}
+$('#csv').onclick=()=>{const rows=[['구분','일시','격자위도','격자경도','강도','유형','시연데이터']].concat(reps().map(r=>['신고',new Date(r.t).toISOString(),r.lat.toFixed(3),r.lng.toFixed(3),r.lv,r.ty,r.demo?'Y':'N'])).concat(acts().map(a=>['조치',new Date(a.t).toISOString(),'','','',a.items.map(i=>CHK[i]).join('/'),a.demo?'Y':'N']));
+ const b=new Blob(['﻿'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='냄새물신뢰지도_개방자료.csv';a.click()};
+// 예측(규칙 기반)
+$('#wx').onclick=async()=>{const f=FAC[0];$('#pnote').textContent='불러오는 중…';
+ try{const u=`https://api.open-meteo.com/v1/forecast?latitude=${f.lat}&longitude=${f.lng}&hourly=wind_speed_10m,wind_direction_10m,relative_humidity_2m&wind_speed_unit=ms&timezone=Asia%2FSeoul&forecast_hours=12`;
+  const j=await (await fetch(u)).json(),h=j.hourly;const rec=reps().filter(r=>r.t>Date.now()-6*36e5&&r.lv>=3).length;
+  const sc=h.time.map((t,i)=>{const toward=(h.wind_direction_10m[i]+180)%360,diff=Math.abs(((toward-RES_BEARING+540)%360)-180);
+   const al=diff<=45?1-diff/45:0,calm=h.wind_speed_10m[i]<3?1:h.wind_speed_10m[i]<5?.5:0,hum=h.relative_humidity_2m[i]>75?1:h.relative_humidity_2m[i]>60?.5:0;
+   const hr=+t.slice(11,13),nt=(hr<8||hr>=19)?1:0;return Math.min(1,.40*al+.25*calm+.15*hum+.10*nt+.10*Math.min(1,rec/3))});
+  $('#pbars').innerHTML=sc.map((v,i)=>`<i title="${h.time[i].slice(11)}시 ${(v*100|0)}점" class="${v>=.6?'hi':v>=.35?'md':''}" style="height:${Math.max(3,v*100)}%"></i>`).join('');
+  $('#plbl').innerHTML=h.time.map(t=>`<span>${t.slice(11,13)}</span>`).join('');
+  const top=sc.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0])[0];
+  $('#pnote').innerHTML=`향후 12시간 중 점검 우선도가 가장 높은 시각: <b>${h.time[top[1]].slice(11)}시경(${top[0]*100|0}점)</b> — 풍향 ${h.wind_direction_10m[top[1]]}°, 풍속 ${h.wind_speed_10m[top[1]]} m/s, 습도 ${h.relative_humidity_2m[top[1]]}%. 점수는 0~100의 상대 지표이며 확률이 아닙니다. 기상: Open-Meteo(시설 시연 좌표 기준), 주거지 방위·가중치는 시연용 가정입니다.`}
+ catch(e){$('#pnote').textContent='예보를 불러오지 못했습니다(네트워크 확인). 나머지 기능은 그대로 사용할 수 있습니다.'}};
+// 정보/설치
+let dp=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;$('#inst').hidden=false});
+$('#inst').onclick=async()=>{if(dp){dp.prompt();dp=null;$('#inst').hidden=true}};
+$('#reset').onclick=()=>{if(confirm('이 기기에 저장된 신고·조치 입력을 지웁니다.')){st={rep:[],act:[]};save();drawMap();pub()}};
+try{const url=location.href.split('#')[0];$('#qrurl').textContent=url;new QRCode($('#qr'),{text:url,width:176,height:176,correctLevel:QRCode.CorrectLevel.M})}catch(e){}
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+drawMap();
+</script>
+</body>
+</html>
